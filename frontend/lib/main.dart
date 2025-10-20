@@ -128,24 +128,72 @@ class HomePage extends StatelessWidget {
     Navigator.of(context).pushReplacementNamed('/login');
   }
 
+  Future<Map<String, dynamic>> _getProfile() async {
+    final userId = supabase.auth.currentUser!.id;
+    // Fetch from 'profiles' table where 'uid' matches the logged-in user's ID.
+    final data = await supabase.from('profiles').select().eq('uid', userId).single();
+    return data;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final user = supabase.auth.currentUser;
-
     return Scaffold(
       appBar: AppBar(title: const Text('Home')),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text('Welcome, ${user?.email ?? 'Guest'}!'),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () => _signOut(context),
-              child: const Text('Sign Out'),
+      body: FutureBuilder<Map<String, dynamic>>(
+        future: _getProfile(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            final user = supabase.auth.currentUser;
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text('Welcome, ${user?.email ?? 'Guest'}!'),
+                  const SizedBox(height: 8),
+                  const Text('Could not load profile. Please complete your profile.'),
+                  const SizedBox(height: 20),
+                  ElevatedButton(
+                    onPressed: () => _signOut(context),
+                    child: const Text('Sign Out'),
+                  ),
+                ],
+              ),
+            );
+          }
+          if (!snapshot.hasData || snapshot.data == null) {
+            return const Center(child: Text('No profile data found.'));
+          }
+
+          final profile = snapshot.data!;
+          final name = profile['name'] ?? 'Guest';
+          final email = profile['email'] ?? 'No email';
+          final photoUrl = profile['photoUrl'];
+
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (photoUrl != null)
+                  CircleAvatar(
+                    radius: 40,
+                    backgroundImage: NetworkImage(photoUrl),
+                  ),
+                const SizedBox(height: 16),
+                Text('Welcome, $name!'),
+                const SizedBox(height: 8),
+                Text('Email: $email'),
+                const SizedBox(height: 20),
+                ElevatedButton(
+                  onPressed: () => _signOut(context),
+                  child: const Text('Sign Out'),
+                ),
+              ],
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }

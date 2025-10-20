@@ -98,3 +98,60 @@ node index.js
 - **Commit:** 7f10e82870cb5e0067a5a17c96871cc07459ebea
   **Date:** Mon Oct 20 15:41:41 2025 +0800
   **Message:** feat: 整合 Supabase Google 登入流程
+
+---
+
+## Supabase 自動同步設定 (一次性)
+
+正如我們所討論的，您需要在 Supabase 後端資料庫設定一個「觸發器」，讓新用戶的資料可以從 `auth.users` 表自動複製到 `public.profile` 表。
+
+這是一個 **一次性** 的設定，完成後此同步流程將會 **永久自動** 執行。
+
+### 操作步驟
+
+1.  登入您的 [Supabase 專案儀表板](https://supabase.com/dashboard)。
+2.  在左側選單中，點擊 **SQL Editor** (圖示為 </> )。
+3.  點擊 **+ New query** 按鈕。
+4.  將下方的完整 SQL 程式碼複製並貼到編輯器中。
+5.  點擊 **RUN** 按鈕。
+
+### 需要執行的 SQL 程式碼
+
+```sql
+-- 刪除舊的 RLS 策略、觸發器和函式 (如果存在)，以便重新建立
+-- This makes the script re-runnable without errors.
+DROP POLICY IF EXISTS "Public profiles are viewable by everyone." ON public.profiles;
+DROP POLICY IF EXISTS "Users can update own profile." ON public.profiles;
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+DROP FUNCTION IF EXISTS public.handle_new_user();
+
+-- 1. 建立或替換一個函式，用於在 public.profiles 中為新用戶建立資料
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  insert into public.profiles (uid, name, email, "photoUrl")
+  values (new.id, new.raw_user_meta_data->>'name', new.email, new.raw_user_meta_data->>'avatar_url');
+  return new;
+end;
+$$;
+
+-- 2. 建立一個觸發器，在 auth.users 表有新資料時自動呼叫上述函式
+CREATE OR REPLACE TRIGGER on_auth_user_created
+  after insert on auth.users
+  for each row execute procedure public.handle_new_user();
+
+-- 3. 為 'profiles' 表啟用資料列級安全 (RLS)
+alter table public.profiles enable row level security;
+
+-- 4. 設定 RLS 策略：允許所有人讀取 profiles，但只允許用戶自己更新
+create policy "Public profiles are viewable by everyone."
+  on public.profiles for select
+  using ( true );
+
+create policy "Users can update own profile."
+  on public.profiles for update
+  using ( auth.uid() = uid );
+```
