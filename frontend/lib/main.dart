@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 Future<void> main() async {
@@ -88,16 +90,45 @@ class LoginPage extends StatelessWidget {
 
   Future<void> _signInWithGoogle(BuildContext context) async {
     try {
-      // NOTE: This is the deep link redirect URL you configured in your Supabase project.
-      // You must also configure this on the native side (Android/iOS).
-      // For Android: android/app/src/main/AndroidManifest.xml
-      // For iOS: ios/Runner/Info.plist
-      const redirectTo = 'io.supabase.flutterdemo://login-callback/';
+      // Get the Web Client ID from the .env file.
+      // You can get this from your Google Cloud Console.
+      final webClientId = dotenv.env['GOOGLE_WEB_CLIENT_ID']!;
 
-      await supabase.auth.signInWithOAuth(
-        OAuthProvider.google,
-        redirectTo: redirectTo,
+      // Start the Google sign-in process.
+      final GoogleSignIn googleSignIn = GoogleSignIn(
+        serverClientId: webClientId,
       );
+      final googleUser = await googleSignIn.signIn();
+
+      if (googleUser == null) {
+        // The user canceled the sign-in.
+        return;
+      }
+
+      // Obtain the auth details from the request.
+      final googleAuth = await googleUser.authentication;
+      final accessToken = googleAuth.accessToken;
+      final idToken = googleAuth.idToken;
+
+      if (idToken == null) {
+        throw 'No ID token found!';
+      }
+
+      // Sign in to Supabase with the Google ID token.
+      await supabase.auth.signInWithIdToken(
+        provider: OAuthProvider.google,
+        idToken: idToken,
+        accessToken: accessToken,
+      );
+
+      // Navigate to home page after successful sign-in.
+      // Use addPostFrameCallback to navigate safely after the build cycle.
+      if (context.mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          Navigator.of(context).pushReplacementNamed('/home');
+        });
+      }
+
     } catch (error) {
       // Handle error
       ScaffoldMessenger.of(context).showSnackBar(
@@ -124,7 +155,9 @@ class HomePage extends StatelessWidget {
   const HomePage({super.key});
 
   Future<void> _signOut(BuildContext context) async {
+    // To ensure a clean logout, you must sign out of both Supabase and Google.
     await supabase.auth.signOut();
+    await GoogleSignIn().signOut();
     Navigator.of(context).pushReplacementNamed('/login');
   }
 

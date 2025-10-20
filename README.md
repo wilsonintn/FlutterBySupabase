@@ -14,7 +14,72 @@
 - **版本控制 (Git)**:
   - 專案已初始化 Git，並已連接到遠端倉庫。
 
+## 登入流程變更：改用原生 Google Sign-In SDK (2025/10/20)
+
+為了提供更好的使用者體驗並避免瀏覽器跳轉，登入流程已從原本的 `signInWithOAuth` (依賴深層連結) 修改為使用 `google_sign_in` 套件進行原生登入。
+
+新的登入流程如下：
+1.  用戶在 App 內點擊登入按鈕。
+2.  App 呼叫原生 Google 登入介面。
+3.  用戶授權後，App 取得 `idToken`。
+4.  App 將 `idToken` 傳送給 Supabase 的 `signInWithIdToken` 方法進行驗證並建立 Session。
+
+### 【重要】新流程的必要設定步驟
+
+為了讓新的登入流程正常運作，你**必須**手動完成以下設定步驟。
+
+#### **步驟 1：取得 Flutter 套件**
+
+在終端機中，進入你的 `frontend` 目錄，然後執行：
+
+```bash
+flutter pub get
+```
+這會安裝我們新加入的 `google_sign_in` 套件。
+
+#### **步驟 2：設定 `GOOGLE_WEB_CLIENT_ID`**
+
+新的程式碼需要一個 `GOOGLE_WEB_CLIENT_ID` 來向 Supabase 驗證 `idToken`。
+
+1.  前往 [Google Cloud Console API & Services > Credentials](https://console.cloud.google.com/apis/credentials)。
+2.  在 **OAuth 2.0 Client IDs** 列表中，找到類型為 **Web client** 的用戶端。這通常是你為 Supabase Google 登入設定的那個。
+3.  複製該用戶端的 **Client ID**。
+4.  打開你專案中的 `frontend/.env` 檔案，加入以下這一行，並貼上你複製的 Client ID：
+    ```
+    GOOGLE_WEB_CLIENT_ID=你的-Web-Client-ID-貼在這裡.apps.googleusercontent.com
+    ```
+
+#### **步驟 3：設定 Android 憑證和 SHA-1 指紋**
+
+這是最關鍵的一步，目的是授權你的 Android App 使用 Google 登入。
+
+1.  **產生 SHA-1 指紋**:
+    *   在你的專案根目錄打開終端機。
+    *   進入 `frontend/android` 目錄：`cd frontend/android`
+    *   執行以下指令：
+        ```bash
+        ./gradlew signingReport
+        ```
+        (如果是在 Windows 上，請執行 `gradlew signingReport`)
+    *   你會看到一長串的輸出。找到 `variant: debug` 或 `variant: release` 區塊，並複製 `SHA1` 後面的值。它看起來像這樣：`A1:B2:C3:...:F9`。
+
+2.  **在 Google Cloud Console 中加入 SHA-1**:
+    *   回到 [Google Cloud Console API & Services > Credentials](https://console.cloud.google.com/apis/credentials) 頁面。
+    *   在 **OAuth 2.0 Client IDs** 列表中，找到**類型為 Android** 的用戶端。（如果沒有，你需要為你的 App 建立一個）。
+    *   點擊名稱進入編輯頁面。
+    *   點擊 **ADD FINGERPRINT**。
+    *   將你剛剛複製的 `SHA-1` 指紋貼上，然後儲存。
+
+#### **步驟 4：重新執行 App**
+
+1.  **完全移除**你手機或模擬器上舊的 App 版本。
+2.  重新建置並執行你的 Flutter 專案。
+
+---
+
 ## Supabase 外部設定 (手動)
+
+**注意：以下為舊版 `signInWithOAuth` 流程的設定說明，在新流程中已不再需要設定 Redirect URL。此處僅為歷史紀錄保留。**
 
 在執行專案前，您必須手動完成以下在 Supabase 和 Google Cloud Console 的設定。
 
@@ -68,6 +133,8 @@ flutter pub get
 **執行應用程式:**
 ```bash
 cd frontend
+flutter clean
+flutter pub get
 flutter run
 ```
 
@@ -146,10 +213,10 @@ CREATE OR REPLACE TRIGGER on_auth_user_created
 -- 3. 為 'profiles' 表啟用資料列級安全 (RLS)
 alter table public.profiles enable row level security;
 
--- 4. 設定 RLS 策略：允許所有人讀取 profiles，但只允許用戶自己更新
-create policy "Public profiles are viewable by everyone."
+-- 4. 設定 RLS 策略：只允許用戶讀取和更新自己的 profile
+create policy "Users can view their own profile."
   on public.profiles for select
-  using ( true );
+  using ( auth.uid() = uid );
 
 create policy "Users can update own profile."
   on public.profiles for update
