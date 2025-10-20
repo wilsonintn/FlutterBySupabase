@@ -95,9 +95,8 @@ class LoginPage extends StatelessWidget {
       const redirectTo = 'io.supabase.flutterdemo://login-callback/';
 
       await supabase.auth.signInWithOAuth(
-        Provider.google,
+        OAuthProvider.google,
         redirectTo: redirectTo,
-        context: context,
       );
     } catch (error) {
       // Handle error
