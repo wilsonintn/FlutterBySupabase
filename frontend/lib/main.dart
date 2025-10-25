@@ -4,9 +4,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'package:frontend/pages/notes_list_page.dart';
-import 'package:frontend/pages/settings_page.dart';
-import 'package:frontend/pages/smart_qa_page.dart';
+import 'package:frontend/pages/main_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -48,9 +46,7 @@ class MyApp extends StatelessWidget {
       routes: <String, WidgetBuilder>{
         '/': (_) => const SplashPage(),
         '/login': (_) => const LoginPage(),
-        '/home': (_) => const NotesListPage(),
-        '/smart_qa': (_) => const SmartQAPage(),
-        '/settings': (_) => const SettingsPage(),
+        '/home': (_) => const MainPage(), // Route to the new main shell
       },
     );
   }

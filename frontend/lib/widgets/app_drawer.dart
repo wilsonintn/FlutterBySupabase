@@ -1,92 +1,45 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-class AppDrawer extends StatefulWidget {
-  const AppDrawer({Key? key}) : super(key: key);
+class AppDrawer extends StatelessWidget {
+  final void Function(int) onItemSelected;
 
-  @override
-  State<AppDrawer> createState() => _AppDrawerState();
-}
-
-class _AppDrawerState extends State<AppDrawer> {
-  Map<String, dynamic>? _profile;
-  bool _isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _getProfile();
-  }
-
-  Future<void> _getProfile() async {
-    setState(() {
-      _isLoading = true;
-    });
-    try {
-      final userId = Supabase.instance.client.auth.currentUser!.id;
-      final data = await Supabase.instance.client
-          .from('profiles')
-          .select()
-          .eq('uid', userId)
-          .single();
-      setState(() {
-        _profile = data;
-        _isLoading = false;
-      });
-    } catch (e) {
-      // Handle error, maybe show a snackbar
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
+  const AppDrawer({Key? key, required this.onItemSelected}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    Widget header;
-    if (_isLoading) {
-      header = const UserAccountsDrawerHeader(
-        accountName: Text('Loading...'),
-        accountEmail: Text(''),
-        currentAccountPicture: CircleAvatar(
-          child: CircularProgressIndicator(color: Colors.white),
-        ),
-      );
-    } else if (_profile != null) {
-      header = UserAccountsDrawerHeader(
-        accountName: Text(_profile!['name'] ?? 'Guest'),
-        accountEmail: Text(_profile!['email'] ?? ''),
-        currentAccountPicture: CircleAvatar(
-          backgroundImage: _profile!['photoUrl'] != null
-              ? NetworkImage(_profile!['photoUrl'])
-              : null,
-          child: _profile!['photoUrl'] == null ? const Icon(Icons.person) : null,
-        ),
-      );
-    } else {
-      header = const UserAccountsDrawerHeader(
-        accountName: Text('Guest'),
-        accountEmail: Text('Could not load profile'),
-        currentAccountPicture: CircleAvatar(
-          child: Icon(Icons.person),
-        ),
-      );
-    }
+    final user = Supabase.instance.client.auth.currentUser;
+    final userMetadata = user?.userMetadata;
 
     return Drawer(
+      backgroundColor: const Color(0xFF2E2E2E),
       child: Column(
         children: [
           Expanded(
             child: ListView(
               padding: EdgeInsets.zero,
               children: [
-                header,
+                UserAccountsDrawerHeader(
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF242424),
+                  ),
+                  accountName: Text(userMetadata?['name'] ?? 'Guest'),
+                  accountEmail: Text(user?.email ?? ''),
+                  currentAccountPicture: CircleAvatar(
+                    backgroundImage: userMetadata?['avatar_url'] != null
+                        ? NetworkImage(userMetadata!['avatar_url'])
+                        : null,
+                    child: userMetadata?['avatar_url'] == null
+                        ? const Icon(Icons.person)
+                        : null,
+                  ),
+                ),
                 ListTile(
                   leading: const Icon(Icons.list_alt),
                   title: const Text('筆記列表'),
                   onTap: () {
                     Navigator.pop(context); // Close drawer
-                    Navigator.pushReplacementNamed(context, '/home');
+                    onItemSelected(0); // Notify main page
                   },
                 ),
                 ListTile(
@@ -94,20 +47,19 @@ class _AppDrawerState extends State<AppDrawer> {
                   title: const Text('智能 QA'),
                   onTap: () {
                     Navigator.pop(context);
-                    Navigator.pushReplacementNamed(context, '/smart_qa');
+                    onItemSelected(1); // Notify main page
                   },
                 ),
               ],
             ),
           ),
-          // This ListTile is outside the ListView to stick to the bottom.
-          const Divider(),
+          const Divider(color: Color(0xFF383838)),
           ListTile(
             leading: const Icon(Icons.settings),
             title: const Text('用戶設定'),
             onTap: () {
               Navigator.pop(context);
-              Navigator.pushReplacementNamed(context, '/settings');
+              onItemSelected(2); // Notify main page
             },
           ),
           const SizedBox(height: 10),

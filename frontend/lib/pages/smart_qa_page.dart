@@ -5,12 +5,28 @@ class SmartQAPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('智能 QA'),
-      ),
-      body: const Center(
-        child: Text('這裡是智能 QA 頁面'),
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0xFF242424),
+              offset: Offset(4, 4),
+              blurRadius: 10,
+            ),
+            BoxShadow(
+              color: Color(0xFF383838),
+              offset: Offset(-4, -4),
+              blurRadius: 10,
+            ),
+          ],
+        ),
+        child: const Center(
+          child: Text('這裡是智能 QA 頁面'),
+        ),
       ),
     );
   }
